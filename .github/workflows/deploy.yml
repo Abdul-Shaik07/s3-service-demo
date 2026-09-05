@@ -50,9 +50,13 @@ jobs:
         key: ${{ secrets.EC2_SSH_KEY }}
         envs: RDS_ENDPOINT,RDS_DATABASE,RDS_USERNAME,RDS_PASSWORD,DOCKERHUB_USERNAME
         script: |
-          docker stop s3-service-demo || true
-          docker rm s3-service-demo || true
+          echo "=== Docker Version ===="
+          docker --version
+          echo "=== Docker pull image ==="
           docker pull ${{ secrets.DOCKERHUB_USERNAME }}/s3-service-demo:latest
+          echo "===== Removing old container if exists ====="
+          docker rm -f s3-service-demo || true
+          echo "===== Starting new container ====="
           docker run -d \
             --name s3-service-demo \ 
             -p 5555:5555 \ 
