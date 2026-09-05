@@ -54,14 +54,15 @@ jobs:
           docker rm s3-service-demo || true
           docker pull ${{ secrets.DOCKERHUB_USERNAME }}/s3-service-demo:latest
           docker run -d \
-          --name s3-service-demo \ 
-          -p 5555:5555 \ 
-          -e RDS_ENDPOINT="${RDS_ENDPOINT}" \ 
-          -e RDS_DATABASE="${RDS_DATABASE}" \ 
-          -e RDS_USERNAME="${RDS_USERNAME}" \ 
-          -e RDS_PASSWORD="${RDS_PASSWORD}" \ 
-          ${{ secrets.DOCKERHUB_USERNAME }}/s3-service-demo:latest 
+            --name s3-service-demo \ 
+            -p 5555:5555 \ 
+            -e RDS_ENDPOINT="${RDS_ENDPOINT}" \ 
+            -e RDS_DATABASE="${RDS_DATABASE}" \ 
+            -e RDS_USERNAME="${RDS_USERNAME}" \ 
+            -e RDS_PASSWORD="${RDS_PASSWORD}" \ 
+            ${{ secrets.DOCKERHUB_USERNAME }}/s3-service-demo:latest 
           echo "===== Deployment completed ====="
+          docker ps
          # docker run -d --name s3-service-demo -p 5555:5555 ${{ secrets.DOCKERHUB_USERNAME }}/s3-service-demo:latest
           
           
