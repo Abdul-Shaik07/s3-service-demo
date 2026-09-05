@@ -49,7 +49,7 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         envs: RDS_ENDPOINT,RDS_DATABASE,RDS_USERNAME,RDS_PASSWORD,DOCKERHUB_USERNAME
-        script:
+        script: |
           docker stop s3-service-demo || true
           docker rm s3-service-demo || true
           docker pull ${{ secrets.DOCKERHUB_USERNAME }}/s3-service-demo:latest
