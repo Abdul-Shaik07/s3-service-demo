@@ -53,7 +53,7 @@ public class S3Controller {
 
     @GetMapping("/message")
     public String message() {
-        return "Hello, I am S3 bucket from AWS...";
+        return "Hello, I am S3 bucket from AWS......";
     }
 
 }
