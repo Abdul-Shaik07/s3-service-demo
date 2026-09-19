@@ -255,12 +255,29 @@ jobs:
 
           echo "SSM Command ID: $COMMAND_ID"
 
-          aws ssm wait command-executed \
+          for i in {1..30}; do
+            STATUS=$(aws ssm get-command-invocation \
             --region "$AWS_REGION" \
             --command-id "$COMMAND_ID" \
-            --instance-id "${{ secrets.EC2_INSTANCE_ID }}"
-  
-          aws ssm get-command-invocation \
-            --region "$AWS_REGION" \
-            --command-id "$COMMAND_ID" \
-            --instance-id "${{ secrets.EC2_INSTANCE_ID }}"
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+            --query "Status" \
+            --output text)
+
+            echo "SSM Status: $STATUS"
+          
+            case "$STATUS" in
+              Success)
+                echo "Deployment successful"
+                break
+                ;;
+              Failed|Cancelled|TimedOut|Cancelling)
+                echo "Deployment failed"
+                aws ssm get-command-invocation \
+                --region "$AWS_REGION" \
+                --command-id "$COMMAND_ID" \
+                --instance-id "${{ secrets.EC2_INSTANCE_ID }}"
+                exit 1
+                ;;
+              esac
+              sleep 10
+          done
