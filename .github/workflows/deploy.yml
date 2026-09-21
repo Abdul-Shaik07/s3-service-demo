@@ -166,6 +166,124 @@
 
 
 
+#name: Build, Push Deploy
+#
+#on:
+#  push:
+#    branches:
+#      - main
+#
+#permissions:
+#  contents: read
+#  id-token: write
+#
+#env:
+#  AWS_REGION: ap-south-2
+#  ECR_REPOSITORY: s3-service-demo
+#  IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+#
+#jobs:
+#  build-push-deploy:
+#    runs-on: ubuntu-latest
+#    steps:
+#      # 1. Checkout code
+#      - name: Checkout code
+#        uses: actions/checkout@v4
+#
+#      # 2. Setup Java 17
+#      - name: Setup Java 17
+#        uses: actions/setup-java@v4
+#        with:
+#          java-version: '17'
+#          distribution: 'temurin'
+#          cache: maven
+#
+#      # 3. BUILD JAR
+#      - name: Build JAR
+#        run: |
+#          chmod +x mvnw
+#          ./mvnw clean package -DskipTests
+#
+#      # 4. Configure AWS Credentials
+#      - name: Configure AWS credentials
+#        uses: aws-actions/configure-aws-credentials@v4
+#        with:
+#          role-to-assume: arn:aws:iam::669561188467:role/GitHubActions-ECR-Push
+#          aws-region: ${{ env.AWS_REGION }}
+#
+#      # 5. Login to AWS ECR
+#      - name: Login to ECR
+#        id: login-ecr
+#        uses: aws-actions/amazon-ecr-login@v2
+#
+#      # 6. Build Docker Image
+#      - name: Build Docker image
+#        env:
+#          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+#          IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+#        run: |
+#          docker build \
+#            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+#
+#      # 7. Push Docker Image
+#      - name: Push Docker image
+#        env:
+#          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+#          IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+#        run: |
+#          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+#
+#      # 8. Deploy to EC2 using SSH
+#      - name: Deploy to EC2 using SSM
+#        env:
+#          AWS_REGION: ${{ env.AWS_REGION }}
+#          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+#          IMAGE_TAG: ${{ github.sha }}
+#        run: |
+#          COMMAND_ID=$(aws ssm send-command \
+#            --region "$AWS_REGION" \
+#            --targets "Key=instanceIds,Values=${{ secrets.EC2_INSTANCE_ID }}" \
+#            --document-name "AWS-RunShellScript" \
+#            --parameters commands="[
+#              \"aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY\",
+#              \"docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
+#              \"docker rm -f s3-service-demo || true\",
+#              \"docker run -d --name s3-service-demo -p 5555:5555 -e RDS_ENDPOINT='${{ secrets.RDS_ENDPOINT }}' -e RDS_DATABASE='${{ secrets.RDS_DATABASE }}' -e RDS_USERNAME='${{ secrets.RDS_USERNAME }}' -e RDS_PASSWORD='${{ secrets.RDS_PASSWORD }}' $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
+#              \"docker ps\"
+#            ]" \
+#            --query "Command.CommandId" \
+#            --output text)
+#
+#          echo "SSM Command ID: $COMMAND_ID"
+#
+#          for i in {1..30}; do
+#            STATUS=$(aws ssm get-command-invocation \
+#            --region "$AWS_REGION" \
+#            --command-id "$COMMAND_ID" \
+#            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+#            --query "Status" \
+#            --output text)
+#
+#            echo "SSM Status: $STATUS"
+#
+#            case "$STATUS" in
+#              Success)
+#                echo "Deployment successful"
+#                break
+#                ;;
+#              Failed|Cancelled|TimedOut|Cancelling)
+#                echo "Deployment failed"
+#                aws ssm get-command-invocation \
+#                --region "$AWS_REGION" \
+#                --command-id "$COMMAND_ID" \
+#                --instance-id "${{ secrets.EC2_INSTANCE_ID }}"
+#                exit 1
+#                ;;
+#              esac
+#              sleep 10
+#          done
+
+
 name: Build, Push Deploy
 
 on:
@@ -180,16 +298,18 @@ permissions:
 env:
   AWS_REGION: ap-south-2
   ECR_REPOSITORY: s3-service-demo
+  IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   build-push-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      # 1. Checkout code
+      # 1. CHECKOUT CODE
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Setup Java 17
+      # 2. SETUP JAVA 17
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -203,41 +323,47 @@ jobs:
           chmod +x mvnw
           ./mvnw clean package -DskipTests
 
-      # 4. Configure AWS Credentials
+      # 4. CONFIGURE AWS CREDENTIALS
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::669561188467:role/GitHubActions-ECR-Push
           aws-region: ${{ env.AWS_REGION }}
 
-      # 5. Login to AWS ECR
+      # 5. LOGIN TO ECR
       - name: Login to ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 6. Build Docker Image
+      # 6. BUILD DOCKER IMAGE
       - name: Build Docker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           docker build \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
 
-      # 7. Push Docker Image
+      # 7. PUSH DOCKER IMAGE
       - name: Push Docker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # 8. Deploy to EC2 using SSH
+      # 8. DISPLAY IMAGE
+      - name: Display image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          echo "======================================"
+          echo "IMAGE:"
+          echo "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "======================================"
+
+      # 9. DEPLOY TO EC2 USING SSH
       - name: Deploy to EC2 using SSM
         env:
-          AWS_REGION: ${{ env.AWS_REGION }}
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
           COMMAND_ID=$(aws ssm send-command \
             --region "$AWS_REGION" \
@@ -247,7 +373,7 @@ jobs:
               \"aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY\",
               \"docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
               \"docker rm -f s3-service-demo || true\",
-              \"docker run -d --name s3-service-demo -p 5555:5555 -e RDS_ENDPOINT='${{ secrets.RDS_ENDPOINT }}' -e RDS_DATABASE='${{ secrets.RDS_DATABASE }}' -e RDS_USERNAME='${{ secrets.RDS_USERNAME }}' -e RDS_PASSWORD='${{ secrets.RDS_PASSWORD }}' $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
+              \"docker run -d --name s3-service-demo --restart unless-stopped -p 5555:5555 -e RDS_ENDPOINT='${{ secrets.RDS_ENDPOINT }}' -e RDS_DATABASE='${{ secrets.RDS_DATABASE }}' -e RDS_USERNAME='${{ secrets.RDS_USERNAME }}' -e RDS_PASSWORD='${{ secrets.RDS_PASSWORD }}' $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",
               \"docker ps\"
             ]" \
             --query "Command.CommandId" \
@@ -256,28 +382,31 @@ jobs:
           echo "SSM Command ID: $COMMAND_ID"
 
           for i in {1..30}; do
+
             STATUS=$(aws ssm get-command-invocation \
-            --region "$AWS_REGION" \
-            --command-id "$COMMAND_ID" \
-            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
-            --query "Status" \
-            --output text)
+              --region "$AWS_REGION" \
+              --command-id "$COMMAND_ID" \
+              --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+              --query "Status" \
+              --output text)
 
             echo "SSM Status: $STATUS"
-          
+
             case "$STATUS" in
               Success)
                 echo "Deployment successful"
                 break
                 ;;
+
               Failed|Cancelled|TimedOut|Cancelling)
                 echo "Deployment failed"
+
                 aws ssm get-command-invocation \
-                --region "$AWS_REGION" \
-                --command-id "$COMMAND_ID" \
-                --instance-id "${{ secrets.EC2_INSTANCE_ID }}"
+                  --region "$AWS_REGION" \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "${{ secrets.EC2_INSTANCE_ID }}"
                 exit 1
                 ;;
-              esac
-              sleep 10
+            esac
+            sleep 10
           done
