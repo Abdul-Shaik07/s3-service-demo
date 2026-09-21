@@ -4,10 +4,14 @@ import com.java.s3_service_demo.repo.ServiceRepository;
 import com.java.s3_service_demo.dto.ServiceRequest;
 import com.java.s3_service_demo.response.ServiceResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +19,11 @@ public class ServiceService implements IServiceService{
 
     private final ServiceRepository serviceRepository;
     private final S3Service s3Service;
+    private final S3Client s3Client;
+    @Value("${aws.region}")
+    private String region;
+    @Value("${aws.s3.bucket}")
+    private String bucketName;
 
     @Override
     public ServiceResponse createService(ServiceRequest serviceRequest, MultipartFile multipartFile) throws IOException {
@@ -56,5 +65,17 @@ public class ServiceService implements IServiceService{
         String url = s3Service.generatePreSignedUrl(service.getImageKey());
         serviceResponse.setImageUrl(url);
         return serviceResponse;
+    }
+
+    @Override
+    public String deleteFileByIdAndFileName(Long id, String fileName) {
+        com.java.s3_service_demo.entity.Service service = serviceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Record not found!"));
+        if(!service.getImageKey().equals(fileName)) {
+            throw new RuntimeException("File name mismatched, please check again!");
+        }
+        s3Service.deleteFile(fileName);
+        serviceRepository.deleteById(id);
+        return "File deleted successfully!";
     }
 }

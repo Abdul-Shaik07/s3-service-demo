@@ -36,19 +36,19 @@ public class S3Controller {
         return ResponseEntity.status(200).body(iServiceService.findByFileName(fileName));
     }
 
-    @PostMapping("/upload-file")
+    /*@PostMapping("/upload-file")
     public ResponseEntity<String> uploadFile(@RequestParam("fileName")MultipartFile multipartFile) throws IOException {
         return ResponseEntity.ok(s3Service.upload(multipartFile));
-    }
+    }*/
 
     @GetMapping("/download-file/{fileName}")
     public ResponseEntity<byte[]> downloadFile(@PathVariable String fileName) {
         return ResponseEntity.ok(s3Service.download(fileName));
     }
 
-    @DeleteMapping("/delete-file/{fileName}")
-    public ResponseEntity<String> deleteFile(@PathVariable String fileName) {
-        return ResponseEntity.ok(s3Service.deleteFile(fileName));
+    @DeleteMapping("/delete-file/{id}/{fileName}")
+    public ResponseEntity<String> deleteFile(@PathVariable Long id, @PathVariable String fileName) {
+        return ResponseEntity.ok(iServiceService.deleteFileByIdAndFileName(id, fileName));
     }
 
     @GetMapping("/message")

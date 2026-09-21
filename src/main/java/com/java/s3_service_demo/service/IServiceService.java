@@ -13,4 +13,5 @@ public interface IServiceService {
 
     ServiceResponse findByFileName(String fileName);
     ServiceResponse findById(Long id);
+    String deleteFileByIdAndFileName(Long id, String fileName);
 }
